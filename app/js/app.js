@@ -41,11 +41,16 @@ async function checkTaxStatus() {
 
         if (response.data && response.data.length > 0) {
             const record = response.data[0];
+            const ctStatus = record.CT_Status;
             modal.classList.remove('hidden');
 
-            const isAuthorized = (userProfile === "TA-Accountants" || userProfile === "TA-General Manager");
+            const isAuthorizedProfile = (userProfile === "TA-Accountants" || userProfile === "TA-General Manager");
+            const isStatusEmpty = (!ctStatus || ctStatus === "");
 
-            if (isAuthorized) {
+            // LOGIC: Show form if Status is empty OR if user has the correct profile
+            if (isStatusEmpty || isAuthorizedProfile) {
+                
+                // Auto-populate existing values if they exist
                 if (record.CT_Status) document.getElementById('ct-status').value = record.CT_Status;
                 if (record.Corporate_Tax_TRN) document.getElementById('corporate-tax-trn').value = record.Corporate_Tax_TRN;
                 if (record.Tax_Period_CT) document.getElementById('tax-period-ct').value = record.Tax_Period_CT;
@@ -56,6 +61,7 @@ async function checkTaxStatus() {
                 saveBtn.classList.remove('hidden');
                 modalTitle.innerText = "Corporate Tax Information";
             } else {
+                // If status is NOT empty AND user is NOT authorized
                 toggleLoading(false); 
                 showPopup("Corporate Tax information can no longer be updated as a value already exists.", "restricted");
             }
