@@ -91,8 +91,8 @@ function hidePopup() {
 document.getElementById('save-btn').onclick = async () => {
     if (validateForm()) {
         toggleLoading(true, "Processing...");
-
-        const function_name = "dev_corporate_tax_ct_setup";
+        //TA_Update Corporate Tax (CT) Setup
+        const function_name = "ta_update_corporate_tax_ct_setup";
         const formData = {
             "arguments": JSON.stringify({
                 "account_id": currentRecordId,
