@@ -1,21 +1,70 @@
 let currentRecordId = null;
+let userProfile = null;
 const SELECTORS = {
   popup: "popup",
   popupTitle: "popupTitle",
   popupMessage: "popupMessage",
 };
 
-// 1. Listen for PageLoad to capture the Record ID
 ZOHO.embeddedApp.on("PageLoad", async (e) => {
     if (e && e.EntityId) {
         currentRecordId = e.EntityId[0];
         
-        // 2. Initialize the SDK
-        ZOHO.embeddedApp.init().then(() => {
+        try {
+            const userData = await ZOHO.CRM.CONFIG.getCurrentUser();
+            userProfile = userData.users[0].profile.name; 
+            
             checkTaxStatus();
-        });
+        } catch (error) {
+            console.error("Initialization Error:", error);
+        }
     }
 });
+
+ZOHO.embeddedApp.init();
+
+async function checkTaxStatus() {
+    if(!currentRecordId) return;
+
+    const modal = document.getElementById('modal-overlay');
+    const form = document.getElementById('record-form');
+    const saveBtn = document.getElementById('save-btn');
+    const modalTitle = document.querySelector('.modal-header h3');
+
+    try {
+        toggleLoading(true, "Loading...");
+
+        const response = await ZOHO.CRM.API.getRecord({
+            Entity: "Accounts",
+            RecordID: currentRecordId
+        });
+
+        if (response.data && response.data.length > 0) {
+            const record = response.data[0];
+            modal.classList.remove('hidden');
+
+            const isAuthorized = (userProfile === "TA-Accountants" || userProfile === "TA-General Manager");
+
+            if (isAuthorized) {
+                if (record.CT_Status) document.getElementById('ct-status').value = record.CT_Status;
+                if (record.Corporate_Tax_TRN) document.getElementById('corporate-tax-trn').value = record.Corporate_Tax_TRN;
+                if (record.Tax_Period_CT) document.getElementById('tax-period-ct').value = record.Tax_Period_CT;
+                if (record.CT_Return_DD) document.getElementById('ct-return-dd').value = record.CT_Return_DD;
+
+                toggleLoading(false);
+                form.classList.remove('hidden');
+                saveBtn.classList.remove('hidden');
+                modalTitle.innerText = "Corporate Tax Information";
+            } else {
+                toggleLoading(false); 
+                showPopup("Corporate Tax information can no longer be updated as a value already exists.", "restricted");
+            }
+        }
+    } catch (error) {
+        toggleLoading(false);
+        console.error("Fetch Error:", error);
+    }
+}
 
 function showPopup(message, type = "restricted") {
   const popup = document.getElementById(SELECTORS.popup);
@@ -30,46 +79,9 @@ function hidePopup() {
     const popup = document.getElementById("popup");
     popup.classList.add("hidden");
     popup.classList.remove("success", "restricted");
-    ZOHO.CRM.UI.Popup.closeReload().then(console.log)
+    ZOHO.CRM.UI.Popup.closeReload();
 }
 
-
-// 3. Check if the field already has a value
-async function checkTaxStatus() {
-    const modal = document.getElementById('modal-overlay');
-    const form = document.getElementById('record-form');
-    const saveBtn = document.getElementById('save-btn');
-    const modalTitle = document.querySelector('.modal-header h3');
-
-    try {
-        toggleLoading(true, "Loading...");
-
-        const response = await ZOHO.CRM.API.getRecord({
-            Entity: "Accounts",
-            RecordID: currentRecordId
-        });
-
-        const record = response.data[0];
-        const ctStatus = record.CT_Status;
-
-        modal.classList.remove('hidden');
-
-        if (!ctStatus) {
-            toggleLoading(false);
-            form.classList.remove('hidden');
-            saveBtn.classList.remove('hidden');
-            modalTitle.innerText = "Corporate Tax Information";
-        } else {
-            toggleLoading(false); 
-            showPopup("Corporate Tax information can no longer be updated because a value already exists.", "restricted");
-        }
-    } catch (error) {
-        toggleLoading(false);
-        console.error("Error:", error);
-    }
-}
-
-// 4. Handle Save Operation
 document.getElementById('save-btn').onclick = async () => {
     if (validateForm()) {
         toggleLoading(true, "Processing...");
@@ -86,32 +98,20 @@ document.getElementById('save-btn').onclick = async () => {
         };
 
         try {
-            const execute_function = await ZOHO.CRM.FUNCTIONS.execute(function_name, formData);
-            console.log("Success:", execute_function);
-            
+            await ZOHO.CRM.FUNCTIONS.execute(function_name, formData);
             toggleLoading(false);
-
             showPopup("Corporate Tax Information updated sucessfully.", "success");
-            
         } catch (error) {
             toggleLoading(false);
             console.error("Function Error", error);
-            alert("An error occurred while updating the account.");
         }
     }
 };
 
-// 5. Handle Close/Cancel
 document.getElementById('cancel-btn').onclick = () => {
-    const btn = document.getElementById('cancel-btn');
-    if (btn.getAttribute('data-action') === 'reload') {
-        ZOHO.CRM.UI.Popup.closeReload();
-    } else {
-        ZOHO.CRM.UI.Popup.close();
-    }
+    ZOHO.CRM.UI.Popup.close();
 };
 
-// 6. Helper Functions
 function validateForm() {
     let isValid = true;
     const fields = ['ct-status', 'corporate-tax-trn', 'tax-period-ct', 'ct-return-dd'];
@@ -131,7 +131,6 @@ function validateForm() {
 function toggleLoading(isLoading) {
     const loadingOverlay = document.getElementById('loading-overlay');
     const saveBtn = document.getElementById('save-btn');
-    
     if (isLoading) {
         loadingOverlay.classList.remove('hidden');
         saveBtn.disabled = true;
@@ -140,5 +139,3 @@ function toggleLoading(isLoading) {
         saveBtn.disabled = false;
     }
 }
-
-ZOHO.embeddedApp.init();
