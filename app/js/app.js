@@ -27,7 +27,7 @@ async function checkTaxStatus() {
     if(!currentRecordId) return;
 
     const modal = document.getElementById('modal-overlay');
-    const form = document.getElementById('record-form');
+    const form = document.getElementById('record-form');l
     const saveBtn = document.getElementById('save-btn');
     const modalTitle = document.querySelector('.modal-header h3');
 
